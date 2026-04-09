@@ -7,7 +7,7 @@ pub struct WorkflowTemplate {
     pub id: String,
     pub name: String,
     pub app: String,
-    pub steps: Vec<crate::nuwa_agent::Step>,
+    pub steps: Vec<nuwa_agent::Step>,
 }
 
 impl Forge {

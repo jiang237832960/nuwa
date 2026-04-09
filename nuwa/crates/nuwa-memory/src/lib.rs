@@ -59,7 +59,7 @@ pub struct KnowledgeEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextualMemory {
     pub user_name: Option<String>,
-    pub称呼方式: Option<String>,
+    pub call_name: Option<String>,
     pub relationship_mode: Option<String>,
 }
 
@@ -82,7 +82,7 @@ impl Memory {
                 },
                 contextual: ContextualMemory {
                     user_name: None,
-                    调用方式: None,
+                    call_name: None,
                     relationship_mode: None,
                 },
             },

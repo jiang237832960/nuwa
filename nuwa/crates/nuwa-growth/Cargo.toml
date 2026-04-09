@@ -13,4 +13,3 @@ thiserror.workspace = true
 anyhow.workspace = true
 parking_lot.workspace = true
 nuwa-memory = { path = "../nuwa-memory" }
-nuwa-experience = { path = "../nuwa-experience", optional = true }

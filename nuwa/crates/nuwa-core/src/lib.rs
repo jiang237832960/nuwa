@@ -1,30 +1,16 @@
-pub mod kernel;
-pub mod agent;
-pub mod world;
-pub mod self_layer;
-pub mod memory;
-pub mod forge;
-pub mod growth;
-pub mod inference;
-pub mod tools;
-pub mod audit;
-pub mod device;
-pub mod benchmark_cn;
-pub mod copy;
-
-pub use kernel::NuwaKernel;
-pub use agent::Agent;
-pub use world::WorldState;
-pub use self_layer::SelfLayer;
-pub use memory::Memory;
-pub use forge::Forge;
-pub use growth::Growth;
-pub use inference::InferenceEngine;
-pub use tools::Tools;
-pub use audit::Audit;
-pub use device::Device;
-pub use benchmark_cn::BenchmarkCN;
-pub use copy::NegotiationCopy;
+pub use nuwa_kernel::NuwaKernel;
+pub use nuwa_agent::Agent;
+pub use nuwa_world::WorldState;
+pub use nuwa_self::SelfLayer;
+pub use nuwa_memory::Memory;
+pub use nuwa_forge::Forge;
+pub use nuwa_growth::Growth;
+pub use nuwa_inference::{InferenceEngine, NuwaInferenceEngine, ModelHandle, GGUFMeta, InferenceError};
+pub use nuwa_tools::Tools;
+pub use nuwa_audit::Audit;
+pub use nuwa_device::Device;
+pub use nuwa_benchmark_cn::BenchmarkCN;
+pub use nuwa_copy::NegotiationCopy;
 
 pub struct NuwaCore {
     kernel: NuwaKernel,
@@ -34,7 +20,7 @@ pub struct NuwaCore {
     memory: Memory,
     forge: Forge,
     growth: Growth,
-    inference: InferenceEngine,
+    inference: NuwaInferenceEngine,
     tools: Tools,
     audit: Audit,
     device: Device,
@@ -52,7 +38,7 @@ impl NuwaCore {
             memory: Memory::new(),
             forge: Forge::new(),
             growth: Growth::new(),
-            inference: InferenceEngine::new(),
+            inference: NuwaInferenceEngine::new(),
             tools: Tools::new(),
             audit: Audit::new(),
             device: Device::new(),

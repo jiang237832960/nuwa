@@ -1,20 +1,20 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/nuwa-core",
-    "crates/nuwa-agent",
-    "crates/nuwa-world",
-    "crates/nuwa-self",
-    "crates/nuwa-memory",
-    "crates/nuwa-forge",
-    "crates/nuwa-growth",
-    "crates/nuwa-inference",
-    "crates/nuwa-tools",
-    "crates/nuwa-audit",
-    "crates/nuwa-kernel",
-    "crates/nuwa-device",
-    "crates/nuwa-benchmark-cn",
-    "crates/nuwa-copy",
+    "nuwa/crates/nuwa-core",
+    "nuwa/crates/nuwa-agent",
+    "nuwa/crates/nuwa-world",
+    "nuwa/crates/nuwa-self",
+    "nuwa/crates/nuwa-memory",
+    "nuwa/crates/nuwa-forge",
+    "nuwa/crates/nuwa-growth",
+    "nuwa/crates/nuwa-inference",
+    "nuwa/crates/nuwa-tools",
+    "nuwa/crates/nuwa-audit",
+    "nuwa/crates/nuwa-kernel",
+    "nuwa/crates/nuwa-device",
+    "nuwa/crates/nuwa-benchmark-cn",
+    "nuwa/crates/nuwa-copy",
 ]
 
 [workspace.package]

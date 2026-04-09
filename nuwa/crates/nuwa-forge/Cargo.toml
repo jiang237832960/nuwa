@@ -14,3 +14,4 @@ anyhow.workspace = true
 parking_lot.workspace = true
 nuwa-tools = { path = "../nuwa-tools" }
 nuwa-world = { path = "../nuwa-world" }
+nuwa-agent = { path = "../nuwa-agent" }

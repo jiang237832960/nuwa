@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
@@ -22,7 +21,7 @@ impl SelfLayer {
     }
 
     pub fn get_device_info(&self) -> Device {
-        self.device.read().clone()
+        (*self.device.read()).clone()
     }
 
     pub fn update_device_info(&self, info: Device) {

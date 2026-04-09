@@ -4,7 +4,7 @@ mod executor;
 mod recovery;
 
 pub use intent::{IntentParser, Intent, IntentError};
-pub use planner::{TaskPlanner, Task, Step, StepResult};
+pub use planner::{TaskPlanner, Task, Step, StepResult, StepStatus, Action, Target, Selector, SelectorType};
 pub use executor::{Executor, ExecutionReport};
 pub use recovery::{Recovery, RecoveryStrategy};
 
@@ -44,14 +44,14 @@ impl Agent {
     }
 
     pub fn plan(&self, intent: &Intent) -> Result<Task, AgentError> {
-        self.planner.plan(intent).map_err(|e| AgentError::PlanError(e.to_string()))
+        self.planner.plan(intent)
     }
 
     pub fn execute(&self, task: &Task) -> Result<ExecutionReport, AgentError> {
-        self.executor.execute(task).map_err(|e| AgentError::ExecutionError(e.to_string()))
+        self.executor.execute(task)
     }
 
     pub fn recover(&self, failed_step: &Step, error: &str) -> Result<RecoveryStrategy, AgentError> {
-        self.recovery.get_strategy(failed_step, error).map_err(|e| AgentError::RecoveryError(e.to_string()))
+        self.recovery.get_strategy(failed_step, error)
     }
 }

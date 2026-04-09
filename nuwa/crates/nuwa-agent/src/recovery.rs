@@ -1,4 +1,4 @@
-use super::{Step, StepResult, StepStatus};
+use crate::{Step, StepStatus, AgentError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,7 +17,7 @@ impl Recovery {
         Self
     }
 
-    pub fn get_strategy(&self, failed_step: &Step, error: &str) -> Result<RecoveryStrategy, super::super::AgentError> {
+    pub fn get_strategy(&self, failed_step: &Step, error: &str) -> Result<RecoveryStrategy, AgentError> {
         if failed_step.fallback.is_some() {
             return Ok(RecoveryStrategy::UseFallback);
         }

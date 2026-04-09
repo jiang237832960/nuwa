@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use crate::nuwa_agent::{Task, StepResult};
-use crate::world::WorldState;
+use nuwa_agent::{Task, StepResult};
+use nuwa_world::WorldState;
 
 pub struct BenchmarkCN {
     tasks: Vec<BenchmarkTask>,
@@ -74,10 +74,10 @@ impl BenchmarkCN {
         match task {
             Some(t) => BenchmarkResult {
                 task_id: task_id.to_string(),
-                success: result.status == crate::nuwa_agent::StepStatus::Success,
+                success: result.status == nuwa_agent::StepStatus::Success,
                 efficiency_score: 0.8,
                 stability_score: 0.8,
-                meets_expectation: result.status == crate::nuwa_agent::StepStatus::Success,
+                meets_expectation: result.status == nuwa_agent::StepStatus::Success,
             },
             None => BenchmarkResult {
                 task_id: task_id.to_string(),

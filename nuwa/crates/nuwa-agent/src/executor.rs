@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use super::{Task, Step, StepResult, StepStatus};
+use crate::{Task, Step, StepResult, StepStatus};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionReport {
@@ -18,7 +18,7 @@ impl Executor {
         Self
     }
 
-    pub fn execute(&self, task: &Task) -> Result<ExecutionReport, super::super::AgentError> {
+    pub fn execute(&self, task: &Task) -> Result<ExecutionReport, crate::AgentError> {
         let mut step_results = Vec::new();
         let mut completed = 0;
         let mut failed = 0;

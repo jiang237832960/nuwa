@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
+#[derive(Debug, Clone)]
 pub struct Device {
     info: DeviceInfo,
     capability_map: CapabilityMap,

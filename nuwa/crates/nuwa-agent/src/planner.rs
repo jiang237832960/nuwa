@@ -82,7 +82,7 @@ impl TaskPlanner {
         }
     }
 
-    pub fn plan(&self, intent: &Intent) -> Result<Task, super::super::AgentError> {
+    pub fn plan(&self, intent: &Intent) -> Result<Task, crate::AgentError> {
         let steps = match intent.intent_type {
             super::intent::IntentType::SendMessage => {
                 if let Some(app) = &intent.target_app {
