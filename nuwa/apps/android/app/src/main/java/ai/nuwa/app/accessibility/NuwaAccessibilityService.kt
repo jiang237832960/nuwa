@@ -217,7 +217,7 @@ class NuwaAccessibilityService : AccessibilityService() {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             nodeInfo.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
         } else {
-            nodeInfo.performAction(AccessibilityNodeInfo.ACTION_SCROLL_DOWN)
+            nodeInfo.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
         }
     }
 
@@ -225,7 +225,7 @@ class NuwaAccessibilityService : AccessibilityService() {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             nodeInfo.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
         } else {
-            nodeInfo.performAction(AccessibilityNodeInfo.ACTION_SCROLL_UP)
+            nodeInfo.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
         }
     }
 
@@ -365,9 +365,8 @@ class NuwaAccessibilityService : AccessibilityService() {
     private fun isAppInForeground(packageName: String): Boolean {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                getSystemService(android.app.ActivityManager::class.java)
-                    ?.getPackageDebugInfo(packageName)
-                packageManager.getApplicationInfo(packageName, 0).enabled
+                val am = getSystemService(android.app.ActivityManager::class.java)
+                am?.runningAppProcesses?.any { it.pkgList.contains(packageName) } ?: false
             } else {
                 @Suppress("DEPRECATION")
                 getSystemService(android.app.ActivityManager::class.java)

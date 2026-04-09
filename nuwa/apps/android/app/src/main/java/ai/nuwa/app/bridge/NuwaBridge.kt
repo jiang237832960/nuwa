@@ -183,9 +183,9 @@ class NuwaBridge {
                 id = 7,
                 action = Action.Input,
                 target = Target(
-                    selector = Selector(SelectorType.ClassName, "android.widget.EditText")
+                    selector = Selector(SelectorType.ClassName, "android.widget.EditText"),
+                    text = contactName
                 ),
-                text = contactName,
                 message = "输入联系人: $contactName"
             ))
             
@@ -232,9 +232,9 @@ class NuwaBridge {
                 id = 4,
                 action = Action.Input,
                 target = Target(
-                    selector = Selector(SelectorType.ClassName, "android.widget.EditText")
+                    selector = Selector(SelectorType.ClassName, "android.widget.EditText"),
+                    text = destination
                 ),
-                text = destination,
                 message = "输入目的地: $destination"
             ))
             
@@ -356,7 +356,7 @@ class NuwaBridge {
             
             Action.Input -> {
                 step.target?.let { target ->
-                    val inputText = step.text ?: ""
+                    val inputText = target.text ?: ""
                     when (target.selector.by) {
                         SelectorType.Text -> {
                             service.findNodeByText(target.selector.value)?.let { node ->

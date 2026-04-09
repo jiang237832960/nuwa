@@ -84,7 +84,10 @@ class MainViewModel : ViewModel() {
             var currentTask = task.copy(status = TaskStatus.Running)
             _currentTask.value = currentTask
             
+            var executionFailed = false
             for ((index, step) in currentTask.steps.withIndex()) {
+                if (executionFailed) break
+                
                 _messages.value = _messages.value + ChatMessage(
                     content = "执行步骤 ${index + 1}: ${step.action.name}",
                     isUser = false
@@ -98,25 +101,24 @@ class MainViewModel : ViewModel() {
                 )
                 _currentTask.value = currentTask
                 
-                withContext(Dispatchers.Default) {
+                val result = withContext(Dispatchers.Default) {
                     try {
-                        val result = bridge.executeStep(step)
-                        
+                        val r = bridge.executeStep(step)
                         currentTask = currentTask.copy(
                             steps = currentTask.steps.toMutableList().apply {
                                 this[index] = step.copy(
-                                    status = if (result) StepStatus.Success else StepStatus.Failed,
-                                    message = if (result) "成功" else "失败"
+                                    status = if (r) StepStatus.Success else StepStatus.Failed,
+                                    message = if (r) "成功" else "失败"
                                 )
                             }
                         )
                         _currentTask.value = currentTask
-                        
+
                         _messages.value = _messages.value + ChatMessage(
-                            content = "步骤 ${index + 1} 完成: ${if (result) "成功" else "失败"}",
+                            content = "步骤 ${index + 1} 完成: ${if (r) "成功" else "失败"}",
                             isUser = false
                         )
-                        
+                        r
                     } catch (e: Exception) {
                         currentTask = currentTask.copy(
                             status = TaskStatus.Failed,
@@ -128,15 +130,19 @@ class MainViewModel : ViewModel() {
                             }
                         )
                         _currentTask.value = currentTask
-                        
+
                         _messages.value = _messages.value + ChatMessage(
                             content = "步骤 ${index + 1} 失败: ${e.message}",
                             isUser = false,
                             error = e.message
                         )
-                        
-                        break
+                        executionFailed = true
+                        false
                     }
+                }
+                
+                if (!result) {
+                    executionFailed = true
                 }
             }
             

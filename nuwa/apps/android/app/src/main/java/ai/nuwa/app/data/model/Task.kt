@@ -40,7 +40,7 @@ data class Task(
     val id: String,
     val intent: Intent,
     val steps: List<Step>,
-    val status: TaskStatus = TaskStatus.Pending,
+    val status: TaskStatus = TaskStatus.Idle,
     val currentStep: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 ) : Serializable

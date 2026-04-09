@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ai.nuwa.app.data.model.ChatMessage
+import ai.nuwa.app.data.model.Task
 import ai.nuwa.app.data.model.TaskStatus
 import ai.nuwa.app.data.model.StepStatus
 import kotlinx.coroutines.launch
@@ -186,11 +187,11 @@ fun TaskProgressBar(
                 }
             }
             LinearProgressIndicator(
-                progress = { progress },
+                progress = progress,
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(8.dp))
-            task.steps.forEachIndexed { index, step ->
+            for (step in task.steps) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(vertical = 2.dp)
