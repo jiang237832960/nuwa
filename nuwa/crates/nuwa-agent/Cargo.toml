@@ -1,0 +1,20 @@
+[package]
+name = "nuwa-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nuwa-inference = { path = "../nuwa-inference" }
+nuwa-world = { path = "../nuwa-world" }
+nuwa-tools = { path = "../nuwa-tools" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+parking_lot.workspace = true
+log.workspace = true
+tracing.workspace = true

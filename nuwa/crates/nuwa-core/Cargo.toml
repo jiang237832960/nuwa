@@ -1,0 +1,25 @@
+[package]
+name = "nuwa-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nuwa-kernel = { path = "../nuwa-kernel" }
+nuwa-agent = { path = "../nuwa-agent" }
+nuwa-world = { path = "../nuwa-world" }
+nuwa-self = { path = "../nuwa-self" }
+nuwa-memory = { path = "../nuwa-memory" }
+nuwa-forge = { path = "../nuwa-forge" }
+nuwa-growth = { path = "../nuwa-growth" }
+nuwa-inference = { path = "../nuwa-inference" }
+nuwa-tools = { path = "../nuwa-tools" }
+nuwa-audit = { path = "../nuwa-audit" }
+nuwa-device = { path = "../nuwa-device" }
+nuwa-benchmark-cn = { path = "../nuwa-benchmark-cn" }
+nuwa-copy = { path = "../nuwa-copy" }
+
+[features]
+default = []
