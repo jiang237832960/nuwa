@@ -4,7 +4,7 @@ mod executor;
 mod recovery;
 
 pub use intent::{IntentParser, Intent, IntentError};
-pub use planner::{TaskPlanner, Task, Step, StepResult, StepStatus, Action, Target, Selector, SelectorType};
+pub use planner::{TaskPlanner, Task, Step, StepResult, StepStatus, Action, Target, Selector, SelectorType, TaskStatus};
 pub use executor::{Executor, ExecutionReport};
 pub use recovery::{Recovery, RecoveryStrategy};
 
