@@ -93,6 +93,13 @@
 **/go.work
 **/Cargo.lock
 
+# Nuwa
+nuwa/apps/android/.gradle/
+nuwa/apps/android/gradle/
+nuwa/apps/android/build/
+nuwa/apps/android/app/build/
+nuwa/platform/android-bridge/target/
+
 # Ruby
 *.gem
 *.rbc
