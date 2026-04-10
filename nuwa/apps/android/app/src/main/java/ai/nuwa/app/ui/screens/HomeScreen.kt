@@ -2,7 +2,6 @@ package ai.nuwa.app.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,15 +24,20 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import ai.nuwa.app.data.model.ChatMessage
 import ai.nuwa.app.data.model.Task
 import ai.nuwa.app.data.model.TaskStatus
 import ai.nuwa.app.data.model.StepStatus
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    messages: List<ChatMessage>,
+    currentTask: Task?,
+    serviceStatus: String,
+    onSendMessage: (String) -> Unit,
+    onCancelTask: () -> Unit,
     onNavigateToWorldState: () -> Unit = {},
     onNavigateToTasks: () -> Unit = {}
 ) {
@@ -41,9 +46,7 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
     
-    var serviceStatus by remember { mutableStateOf("已连接") }
-    var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
-    var currentTask by remember { mutableStateOf<Task?>(null) }
+    val actualServiceStatus = remember(serviceStatus) { serviceStatus }
     
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -77,9 +80,9 @@ fun HomeScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = getStatusText(serviceStatus),
+                            text = getStatusText(actualServiceStatus),
                             style = MaterialTheme.typography.bodySmall,
-                            color = getStatusColor(serviceStatus)
+                            color = getStatusColor(actualServiceStatus)
                         )
                     }
                 }
@@ -105,7 +108,7 @@ fun HomeScreen(
             currentTask?.let { task ->
                 TaskProgressCard(
                     task = task,
-                    onCancel = { currentTask = null }
+                    onCancel = onCancelTask
                 )
             }
         }
@@ -120,18 +123,16 @@ fun HomeScreen(
         ) {
             if (messages.isEmpty()) {
                 item {
-                    WelcomeCard()
+                    WelcomeCard(onSuggestionClick = { suggestion ->
+                        onSendMessage(suggestion)
+                    })
                 }
             }
             
             items(messages) { message ->
                 ChatBubbleItem(
                     message = message,
-                    onRetry = {
-                        if (message.error != null) {
-                            messages = messages.filter { it.id != message.id }
-                        }
-                    }
+                    onRetry = { }
                 )
             }
         }
@@ -141,24 +142,12 @@ fun HomeScreen(
             onTextChange = { inputText = it },
             onSend = {
                 if (inputText.isNotBlank()) {
-                    val userMessage = ChatMessage(
-                        content = inputText,
-                        isUser = true
-                    )
-                    messages = messages + userMessage
+                    onSendMessage(inputText)
                     inputText = ""
                     keyboardController?.hide()
-                    
-                    scope.launch {
-                        kotlinx.coroutines.delay(1000)
-                        messages = messages + ChatMessage(
-                            content = "收到！我来帮你完成",
-                            isUser = false
-                        )
-                    }
                 }
             },
-            enabled = serviceStatus == "已连接"
+            enabled = actualServiceStatus == "已连接"
         )
     }
 }
@@ -177,7 +166,7 @@ private fun getStatusColor(status: String) = when (status) {
 }
 
 @Composable
-fun WelcomeCard() {
+fun WelcomeCard(onSuggestionClick: (String) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -218,21 +207,21 @@ fun WelcomeCard() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     AssistChip(
-                        onClick = { },
+                        onClick = { onSuggestionClick("给张三发消息") },
                         label = { Text("发微信") },
                         leadingIcon = { Icon(Icons.Default.Message, null, Modifier.size(18.dp)) },
                         modifier = Modifier.weight(1f)
                     )
                     AssistChip(
-                        onClick = { },
+                        onClick = { onSuggestionClick("帮我导航到公司") },
                         label = { Text("导航") },
                         leadingIcon = { Icon(Icons.Default.Navigation, null, Modifier.size(18.dp)) },
                         modifier = Modifier.weight(1f)
                     )
                 }
                 AssistChip(
-                    onClick = { },
-                    label = { Text("打开文档") },
+                    onClick = { onSuggestionClick("打开文档") },
+                    label = { Text("打开WPS文档") },
                     leadingIcon = { Icon(Icons.Default.Description, null, Modifier.size(18.dp)) }
                 )
             }
@@ -460,7 +449,7 @@ fun ChatInputBar(
                 modifier = Modifier.size(48.dp)
             ) {
                 Icon(
-                    Icons.Default.Send,
+                    Icons.AutoMirrored.Filled.Send,
                     contentDescription = "发送",
                     tint = if (enabled && text.isNotBlank())
                         MaterialTheme.colorScheme.onPrimary

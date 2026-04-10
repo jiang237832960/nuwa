@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -25,6 +26,7 @@ fun NuwaApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val viewModel: MainViewModel = viewModel()
     
     var hasCompletedOnboarding by remember { mutableStateOf(false) }
     
@@ -34,6 +36,10 @@ fun NuwaApp() {
         Screen.Skills.route,
         Screen.Profile.route
     )
+    
+    val messages by viewModel.messages.collectAsState()
+    val currentTask by viewModel.currentTask.collectAsState()
+    val serviceStatus by viewModel.serviceStatus.collectAsState()
     
     Scaffold(
         bottomBar = {
@@ -122,6 +128,11 @@ fun NuwaApp() {
                 exitTransition = { fadeOut() }
             ) {
                 HomeScreen(
+                    messages = messages,
+                    currentTask = currentTask,
+                    serviceStatus = serviceStatus,
+                    onSendMessage = { text -> viewModel.sendMessage(text) },
+                    onCancelTask = { viewModel.cancelTask() },
                     onNavigateToWorldState = { navController.navigate(Screen.WorldState.route) },
                     onNavigateToTasks = { navController.navigate(Screen.Tasks.route) }
                 )
