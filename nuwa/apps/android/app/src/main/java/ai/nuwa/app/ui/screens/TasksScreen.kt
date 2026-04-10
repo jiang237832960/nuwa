@@ -13,28 +13,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import ai.nuwa.app.data.model.Task
 import ai.nuwa.app.data.model.TaskStatus
-import ai.nuwa.app.data.model.StepStatus
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TasksScreen() {
+fun TasksScreen(
+    tasks: List<Task> = emptyList(),
+    onTaskClick: (Task) -> Unit = {}
+) {
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("进行中", "已完成", "已失败")
-    
-    val sampleTasks = remember {
-        listOf(
-            TaskSample("1", "给张三发消息", TaskStatus.Running, 2, 5, System.currentTimeMillis() - 60000),
-            TaskSample("2", "导航到公司", TaskStatus.Completed, 5, 5, System.currentTimeMillis() - 3600000),
-            TaskSample("3", "打开文档", TaskStatus.Failed, 2, 4, System.currentTimeMillis() - 7200000)
-        )
-    }
     
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -54,12 +46,12 @@ fun TasksScreen() {
             }
         }
         
-        val filteredTasks = remember(selectedTab, sampleTasks) {
+        val filteredTasks = remember(tasks, selectedTab) {
             when (selectedTab) {
-                0 -> sampleTasks.filter { it.status == TaskStatus.Running }
-                1 -> sampleTasks.filter { it.status == TaskStatus.Completed }
-                2 -> sampleTasks.filter { it.status == TaskStatus.Failed }
-                else -> sampleTasks
+                0 -> tasks.filter { it.status == TaskStatus.Running || it.status == TaskStatus.Idle }
+                1 -> tasks.filter { it.status == TaskStatus.Completed }
+                2 -> tasks.filter { it.status == TaskStatus.Failed }
+                else -> tasks
             }
         }
         
@@ -70,17 +62,33 @@ fun TasksScreen() {
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        Icons.Default.CheckCircle,
+                        when (selectedTab) {
+                            0 -> Icons.Default.PlayCircle
+                            1 -> Icons.Default.CheckCircle
+                            else -> Icons.Default.Warning
+                        },
                         null,
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "暂无任务",
+                        text = when (selectedTab) {
+                            0 -> "暂无进行中的任务"
+                            1 -> "暂无已完成的任务"
+                            else -> "暂无失败的任务"
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (selectedTab == 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "在首页发送指令来创建任务",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
             }
         } else {
@@ -89,26 +97,25 @@ fun TasksScreen() {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(filteredTasks) { task ->
-                    TaskCard(task = task)
+                    TaskCard(
+                        task = task,
+                        onClick = { onTaskClick(task) }
+                    )
                 }
             }
         }
     }
 }
 
-data class TaskSample(
-    val id: String,
-    val title: String,
-    val status: TaskStatus,
-    val completedSteps: Int,
-    val totalSteps: Int,
-    val timestamp: Long
-)
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskCard(task: TaskSample) {
+fun TaskCard(
+    task: Task,
+    onClick: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -129,7 +136,8 @@ fun TaskCard(task: TaskSample) {
                                 when (task.status) {
                                     TaskStatus.Running -> MaterialTheme.colorScheme.primaryContainer
                                     TaskStatus.Completed -> MaterialTheme.colorScheme.tertiaryContainer
-                                    else -> MaterialTheme.colorScheme.errorContainer
+                                    TaskStatus.Failed -> MaterialTheme.colorScheme.errorContainer
+                                    else -> MaterialTheme.colorScheme.surfaceVariant
                                 }
                             ),
                         contentAlignment = Alignment.Center
@@ -138,24 +146,26 @@ fun TaskCard(task: TaskSample) {
                             imageVector = when (task.status) {
                                 TaskStatus.Running -> Icons.Default.PlayArrow
                                 TaskStatus.Completed -> Icons.Default.CheckCircle
-                                else -> Icons.Default.Warning
+                                TaskStatus.Failed -> Icons.Default.Warning
+                                else -> Icons.Default.Pending
                             },
                             contentDescription = null,
                             tint = when (task.status) {
                                 TaskStatus.Running -> MaterialTheme.colorScheme.primary
                                 TaskStatus.Completed -> MaterialTheme.colorScheme.tertiary
-                                else -> MaterialTheme.colorScheme.error
+                                TaskStatus.Failed -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.outline
                             }
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = task.title,
+                            text = task.intent.rawText.take(30),
                             style = MaterialTheme.typography.titleSmall
                         )
                         Text(
-                            text = formatTimestamp(task.timestamp),
+                            text = formatTimestamp(task.createdAt),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -164,7 +174,7 @@ fun TaskCard(task: TaskSample) {
                 
                 when (task.status) {
                     TaskStatus.Running -> {
-                        TextButton(onClick = { }) {
+                        TextButton(onClick = onClick) {
                             Text("继续")
                         }
                     }
@@ -175,23 +185,28 @@ fun TaskCard(task: TaskSample) {
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
-                    else -> {
-                        TextButton(onClick = { }) {
+                    TaskStatus.Failed -> {
+                        TextButton(onClick = onClick) {
                             Text("重试")
                         }
                     }
+                    else -> {}
                 }
             }
             
             if (task.status == TaskStatus.Running) {
                 Spacer(modifier = Modifier.height(12.dp))
+                val completedSteps = task.steps.count { it.status == ai.nuwa.app.data.model.StepStatus.Success }
+                val totalSteps = task.steps.size
+                val progress = if (totalSteps > 0) completedSteps.toFloat() / totalSteps else 0f
+                
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     LinearProgressIndicator(
-                        progress = task.completedSteps.toFloat() / task.totalSteps,
+                        progress = progress,
                         modifier = Modifier
                             .weight(1f)
                             .height(4.dp)
@@ -200,8 +215,17 @@ fun TaskCard(task: TaskSample) {
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "${task.completedSteps}/${task.totalSteps}",
+                        text = "$completedSteps/$totalSteps",
                         style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                task.steps.getOrNull(task.currentStep)?.message?.let { message ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

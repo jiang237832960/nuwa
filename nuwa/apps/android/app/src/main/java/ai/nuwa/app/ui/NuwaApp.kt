@@ -148,7 +148,9 @@ fun NuwaApp() {
                 enterTransition = { fadeIn() },
                 exitTransition = { fadeOut() }
             ) {
-                TasksScreen()
+                TasksScreen(
+                    tasks = listOfNotNull(currentTask)
+                )
             }
             
             composable(
@@ -165,6 +167,8 @@ fun NuwaApp() {
                 exitTransition = { fadeOut() }
             ) {
                 ProfileScreen(
+                    currentModelName = if (isModelLoaded) modelStatus?.substringAfter("已加载: ")?.trim() else null,
+                    learnedSkillsCount = 0,
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                     onNavigateToModelManager = { navController.navigate(Screen.ModelManager.route) },
                     onNavigateToGrowth = { navController.navigate(Screen.Growth.route) }
@@ -177,6 +181,9 @@ fun NuwaApp() {
                 exitTransition = { slideOutVertically { it } }
             ) {
                 WorldStateSheet(
+                    isAccessibilityEnabled = serviceStatus == "已连接",
+                    foregroundApp = "",
+                    onRequestAccessibility = { },
                     onDismiss = { navController.popBackStack() }
                 )
             }
@@ -187,6 +194,8 @@ fun NuwaApp() {
                 exitTransition = { slideOutHorizontally { it } }
             ) {
                 SettingsScreen(
+                    isAccessibilityEnabled = serviceStatus == "已连接",
+                    onRequestAccessibility = { },
                     onBack = { navController.popBackStack() }
                 )
             }
