@@ -1,9 +1,14 @@
 package ai.nuwa.app.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ai.nuwa.app.data.model.*
+import ai.nuwa.app.data.repository.ModelRepository
 import ai.nuwa.app.bridge.NuwaBridge
+import ai.nuwa.app.inference.InferenceResult
+import ai.nuwa.app.inference.ModelManager
+import ai.nuwa.app.inference.ModelManagerHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,9 +16,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class MainViewModel : ViewModel() {
+class MainViewModel(application: Application) : AndroidViewModel(application) {
     
-    private val bridge = NuwaBridge()
+    private val modelRepository = ModelRepository(application)
+    private val bridge = NuwaBridge(modelRepository)
+    private val modelManager = ModelManagerHolder.getInstance(modelRepository)
     
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -27,141 +34,171 @@ class MainViewModel : ViewModel() {
     private val _worldState = MutableStateFlow(WorldState())
     val worldState: StateFlow<WorldState> = _worldState.asStateFlow()
     
+    private val _isModelLoaded = MutableStateFlow(false)
+    val isModelLoaded: StateFlow<Boolean> = _isModelLoaded.asStateFlow()
+    
     init {
         checkServiceStatus()
+        loadDefaultModel()
+    }
+    
+    private fun loadDefaultModel() {
+        viewModelScope.launch {
+            val currentModel = modelRepository.getCurrentModel()
+            if (currentModel != null && currentModel.path.isNotEmpty()) {
+                loadModel(currentModel)
+            }
+        }
+    }
+    
+    private suspend fun loadModel(modelInfo: ai.nuwa.app.data.repository.ModelInfo) {
+        withContext(Dispatchers.IO) {
+            val result = modelManager.loadModel(modelInfo)
+            result.fold(
+                onSuccess = {
+                    _isModelLoaded.value = true
+                    addMessage("模型已加载: ${modelInfo.name}", false)
+                },
+                onFailure = { error ->
+                    addMessage("模型加载失败: ${error.message}", false)
+                }
+            )
+        }
     }
     
     fun checkServiceStatus() {
         viewModelScope.launch {
-            _serviceStatus.value = if (bridge.isServiceConnected()) "已连接" else "未连接"
+            val connected = bridge.isServiceConnected()
+            _serviceStatus.value = if (connected) "已连接" else "未连接"
         }
     }
     
     fun sendMessage(text: String) {
         if (text.isBlank()) return
         
+        addMessage(text, true)
+        
         viewModelScope.launch {
-            val userMessage = ChatMessage(content = text, isUser = true)
-            _messages.value = _messages.value + userMessage
-            
-            _messages.value = _messages.value + ChatMessage(
-                content = "正在理解您的意图...",
-                isUser = false
-            )
-            
-            withContext(Dispatchers.Default) {
-                try {
-                    val intent = bridge.parseIntent(text)
-                    
-                    _messages.value = _messages.value.dropLast(1) + ChatMessage(
-                        content = "已识别意图: ${intent.intentType.name}",
-                        isUser = false
-                    )
-                    
-                    val task = bridge.planTask(intent)
-                    _currentTask.value = task
-                    
-                    _messages.value = _messages.value + ChatMessage(
-                        content = "任务已创建，共 ${task.steps.size} 个步骤",
-                        isUser = false
-                    )
-                    
-                    executeTask(task)
-                    
-                } catch (e: Exception) {
-                    _messages.value = _messages.value.dropLast(1) + ChatMessage(
-                        content = "处理失败: ${e.message}",
-                        isUser = false,
-                        error = e.message
-                    )
+            try {
+                addMessage("正在分析你的意图...", false)
+                
+                val intent = bridge.parseIntent(text)
+                
+                val intentDescription = when (intent.intentType) {
+                    IntentType.SendMessage -> {
+                        val contact = intent.entities.find { it.entityType == EntityType.Person }?.value
+                        if (contact != null) "发送微信消息给 $contact" else "发送微信消息"
+                    }
+                    IntentType.Navigate -> {
+                        val location = intent.entities.find { it.entityType == EntityType.Location }?.value
+                        if (location != null) "导航到 $location" else "使用导航"
+                    }
+                    IntentType.OpenApp -> "打开应用"
+                    IntentType.OpenFile -> "打开文档"
+                    IntentType.QueryBill -> "查询账单"
+                    IntentType.SearchContact -> "搜索联系人"
+                    IntentType.SaveImage -> "保存图片"
+                    IntentType.Unknown -> "未知任务"
                 }
+                
+                addMessage("已理解: $intentDescription", false)
+                
+                val modelLoaded = modelManager.isModelLoaded()
+                if (modelLoaded) {
+                    addMessage("正在思考...", false)
+                    val inferenceResult = modelManager.generate("用户说: $text")
+                    when (inferenceResult) {
+                        is InferenceResult.Success -> {
+                            addMessage(inferenceResult.response, false)
+                        }
+                        is InferenceResult.Error -> {
+                            addMessage("思考中断: ${inferenceResult.message}", false)
+                        }
+                    }
+                }
+                
+                val task = bridge.planTask(intent)
+                _currentTask.value = task
+                
+                addMessage("任务已规划，共 ${task.steps.size} 个步骤", false)
+                
+                executeTask(task)
+                
+            } catch (e: Exception) {
+                addMessage("处理失败: ${e.message}", false, e.message)
             }
         }
     }
     
-    fun executeTask(task: Task) {
-        viewModelScope.launch {
-            var currentTask = task.copy(status = TaskStatus.Running)
+    private suspend fun executeTask(task: Task) {
+        var currentTask = task.copy(status = TaskStatus.Running)
+        _currentTask.value = currentTask
+        
+        var executionFailed = false
+        
+        for ((index, step) in currentTask.steps.withIndex()) {
+            if (executionFailed) break
+            
+            addMessage("执行步骤 ${index + 1}/${currentTask.steps.size}: ${step.message}", false)
+            
+            currentTask = currentTask.copy(
+                currentStep = index,
+                steps = currentTask.steps.toMutableList().apply {
+                    this[index] = step.copy(status = StepStatus.Running)
+                }
+            )
             _currentTask.value = currentTask
             
-            var executionFailed = false
-            for ((index, step) in currentTask.steps.withIndex()) {
-                if (executionFailed) break
-                
-                _messages.value = _messages.value + ChatMessage(
-                    content = "执行步骤 ${index + 1}: ${step.action.name}",
-                    isUser = false
-                )
-                
-                currentTask = currentTask.copy(
-                    currentStep = index,
-                    steps = currentTask.steps.toMutableList().apply {
-                        this[index] = step.copy(status = StepStatus.Running)
+            val result = withContext(Dispatchers.Default) {
+                try {
+                    val r = bridge.executeStep(step)
+                    currentTask = currentTask.copy(
+                        steps = currentTask.steps.toMutableList().apply {
+                            this[index] = step.copy(
+                                status = if (r) StepStatus.Success else StepStatus.Failed,
+                                message = if (r) "成功" else "失败"
+                            )
+                        }
+                    )
+                    _currentTask.value = currentTask
+                    
+                    if (r) {
+                        addMessage("步骤 ${index + 1} 完成", false)
+                    } else {
+                        addMessage("步骤 ${index + 1} 失败", false, "执行失败")
                     }
-                )
-                _currentTask.value = currentTask
-                
-                val result = withContext(Dispatchers.Default) {
-                    try {
-                        val r = bridge.executeStep(step)
-                        currentTask = currentTask.copy(
-                            steps = currentTask.steps.toMutableList().apply {
-                                this[index] = step.copy(
-                                    status = if (r) StepStatus.Success else StepStatus.Failed,
-                                    message = if (r) "成功" else "失败"
-                                )
-                            }
-                        )
-                        _currentTask.value = currentTask
-
-                        _messages.value = _messages.value + ChatMessage(
-                            content = "步骤 ${index + 1} 完成: ${if (r) "成功" else "失败"}",
-                            isUser = false
-                        )
-                        r
-                    } catch (e: Exception) {
-                        currentTask = currentTask.copy(
-                            status = TaskStatus.Failed,
-                            steps = currentTask.steps.toMutableList().apply {
-                                this[index] = step.copy(
-                                    status = StepStatus.Failed,
-                                    message = e.message
-                                )
-                            }
-                        )
-                        _currentTask.value = currentTask
-
-                        _messages.value = _messages.value + ChatMessage(
-                            content = "步骤 ${index + 1} 失败: ${e.message}",
-                            isUser = false,
-                            error = e.message
-                        )
-                        executionFailed = true
-                        false
-                    }
-                }
-                
-                if (!result) {
+                    r
+                } catch (e: Exception) {
+                    currentTask = currentTask.copy(
+                        status = TaskStatus.Failed,
+                        steps = currentTask.steps.toMutableList().apply {
+                            this[index] = step.copy(
+                                status = StepStatus.Failed,
+                                message = e.message
+                            )
+                        }
+                    )
+                    _currentTask.value = currentTask
+                    addMessage("步骤 ${index + 1} 出错: ${e.message}", false, e.message)
                     executionFailed = true
+                    false
                 }
             }
             
-            if (currentTask.steps.all { it.status == StepStatus.Success }) {
-                currentTask = currentTask.copy(status = TaskStatus.Completed)
-                _messages.value = _messages.value + ChatMessage(
-                    content = "任务完成！",
-                    isUser = false
-                )
-            } else {
-                currentTask = currentTask.copy(status = TaskStatus.Failed)
-                _messages.value = _messages.value + ChatMessage(
-                    content = "任务失败",
-                    isUser = false,
-                    error = "部分步骤未完成"
-                )
+            if (!result) {
+                executionFailed = true
             }
-            
+        }
+        
+        if (currentTask.steps.all { it.status == StepStatus.Success }) {
+            currentTask = currentTask.copy(status = TaskStatus.Completed)
             _currentTask.value = currentTask
+            addMessage("任务完成！", false)
+        } else {
+            currentTask = currentTask.copy(status = TaskStatus.Failed)
+            _currentTask.value = currentTask
+            val failedStep = currentTask.steps.indexOfFirst { it.status == StepStatus.Failed }
+            addMessage("任务失败，步骤 ${failedStep + 1} 未完成", false, "部分步骤失败")
         }
     }
     
@@ -181,10 +218,22 @@ class MainViewModel : ViewModel() {
                 try {
                     val state = bridge.getWorldState()
                     _worldState.value = state
+                    _serviceStatus.value = if (bridge.isServiceConnected()) "已连接" else "未连接"
                 } catch (e: Exception) {
                     _serviceStatus.value = "获取状态失败: ${e.message}"
                 }
             }
         }
+    }
+    
+    private fun addMessage(content: String, isUser: Boolean, error: String? = null) {
+        val message = ChatMessage(
+            id = "msg_${System.currentTimeMillis()}_${(Math.random() * 1000).toInt()}",
+            content = content,
+            isUser = isUser,
+            timestamp = System.currentTimeMillis(),
+            error = error
+        )
+        _messages.value = _messages.value + message
     }
 }

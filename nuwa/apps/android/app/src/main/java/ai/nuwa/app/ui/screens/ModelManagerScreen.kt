@@ -21,7 +21,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ai.nuwa.app.data.repository.ModelInfo
 import ai.nuwa.app.data.repository.ModelRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private enum class StatusType { Info, Success, Error }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,9 +37,9 @@ fun ModelManagerScreen(
     val modelRepository = remember { repository ?: ModelRepository(context) }
     val scope = rememberCoroutineScope()
     
-    var showImportDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf<ModelInfo?>(null) }
-    var importStatus by remember { mutableStateOf<String?>(null) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var statusType by remember { mutableStateOf(StatusType.Info) }
     var isImporting by remember { mutableStateOf(false) }
     
     val models = remember { modelRepository.getImportedModels() }
@@ -44,21 +48,33 @@ fun ModelManagerScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let {
+        if (uri != null) {
             isImporting = true
-            importStatus = "正在导入模型..."
+            statusMessage = "正在导入模型..."
+            statusType = StatusType.Info
+            
             scope.launch {
-                val result = modelRepository.importModel(it)
-                result.fold(
-                    onSuccess = { model ->
-                        importStatus = "导入成功: ${model.name}"
-                        isImporting = false
-                    },
-                    onFailure = { error ->
-                        importStatus = "导入失败: ${error.message}"
-                        isImporting = false
+                try {
+                    val result = withContext(Dispatchers.IO) {
+                        modelRepository.importModel(uri)
                     }
-                )
+                    
+                    result.fold(
+                        onSuccess = { model ->
+                            statusMessage = "导入成功: ${model.name}"
+                            statusType = StatusType.Success
+                        },
+                        onFailure = { error ->
+                            statusMessage = error.message ?: "导入失败"
+                            statusType = StatusType.Error
+                        }
+                    )
+                } catch (e: Exception) {
+                    statusMessage = "导入失败: ${e.message}"
+                    statusType = StatusType.Error
+                } finally {
+                    isImporting = false
+                }
             }
         }
     }
@@ -72,11 +88,16 @@ fun ModelManagerScreen(
                 }
             },
             actions = {
-                IconButton(
-                    onClick = { filePickerLauncher.launch(arrayOf("*/*")) },
-                    enabled = !isImporting
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "导入模型")
+                if (!isImporting) {
+                    IconButton(onClick = { 
+                        filePickerLauncher.launch(arrayOf(
+                            "application/octet-stream",
+                            "application/x-gguf",
+                            "*/*"
+                        ))
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "导入模型")
+                    }
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -84,15 +105,14 @@ fun ModelManagerScreen(
             )
         )
         
-        importStatus?.let { status ->
+        if (statusMessage != null) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = if (status.contains("成功"))
-                    MaterialTheme.colorScheme.primaryContainer
-                else if (status.contains("失败"))
-                    MaterialTheme.colorScheme.errorContainer
-                else
-                    MaterialTheme.colorScheme.surfaceVariant
+                color = when (statusType) {
+                    StatusType.Success -> MaterialTheme.colorScheme.primaryContainer
+                    StatusType.Error -> MaterialTheme.colorScheme.errorContainer
+                    StatusType.Info -> MaterialTheme.colorScheme.surfaceVariant
+                }
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp),
@@ -104,11 +124,31 @@ fun ModelManagerScreen(
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(
+                            when (statusType) {
+                                StatusType.Success -> Icons.Default.CheckCircle
+                                StatusType.Error -> Icons.Default.Error
+                                StatusType.Info -> Icons.Default.Info
+                            },
+                            null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
-                        text = status,
-                        style = MaterialTheme.typography.bodySmall
+                        text = statusMessage!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
                     )
+                    if (!isImporting) {
+                        IconButton(
+                            onClick = { statusMessage = null },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Default.Close, null, Modifier.size(16.dp))
+                        }
+                    }
                 }
             }
         }
@@ -135,23 +175,58 @@ fun ModelManagerScreen(
                 )
             }
             
-            items(models) { model ->
-                ImportedModelCard(
-                    model = model,
-                    isSelected = model.id == currentModel?.id,
-                    onSelect = {
-                        modelRepository.setCurrentModel(model.id)
-                    },
-                    onDelete = {
-                        showDeleteDialog = model
+            if (models.isEmpty()) {
+                item {
+                    ImportHelpCard(
+                        onImportClick = { 
+                            filePickerLauncher.launch(arrayOf(
+                                "application/octet-stream",
+                                "application/x-gguf",
+                                "*/*"
+                            ))
+                        }
+                    )
+                }
+            } else {
+                items(models) { model ->
+                    ImportedModelCard(
+                        model = model,
+                        isSelected = model.id == currentModel?.id,
+                        onSelect = {
+                            modelRepository.setCurrentModel(model.id)
+                            statusMessage = "已切换到: ${model.name}"
+                            statusType = StatusType.Success
+                        },
+                        onDelete = {
+                            showDeleteDialog = model
+                        }
+                    )
+                }
+                
+                item {
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { 
+                            filePickerLauncher.launch(arrayOf(
+                                "application/octet-stream",
+                                "application/x-gguf",
+                                "*/*"
+                            ))
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Add, null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("导入更多模型")
+                        }
                     }
-                )
-            }
-            
-            item {
-                ImportHelpCard(
-                    onImportClick = { filePickerLauncher.launch(arrayOf("*/*")) }
-                )
+                }
             }
         }
     }
@@ -165,6 +240,8 @@ fun ModelManagerScreen(
                 TextButton(
                     onClick = {
                         modelRepository.deleteModel(model.id)
+                        statusMessage = "已删除: ${model.name}"
+                        statusType = StatusType.Success
                         showDeleteDialog = null
                     },
                     colors = ButtonDefaults.textButtonColors(
@@ -357,7 +434,7 @@ fun ImportHelpCard(onImportClick: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
@@ -371,12 +448,13 @@ fun ImportHelpCard(onImportClick: () -> Unit) {
                 text = "导入 GGUF 模型",
                 style = MaterialTheme.typography.titleSmall
             )
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "支持 Qwen、LLaMA、ChatGLM 等主流模型格式",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             FilledTonalButton(onClick = onImportClick) {
                 Icon(Icons.Default.Add, null)
                 Spacer(modifier = Modifier.width(4.dp))

@@ -3,6 +3,8 @@ package ai.nuwa.app.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
+import android.os.Environment
+import android.provider.OpenableColumns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -41,13 +43,30 @@ class ModelRepository(private val context: Context) {
     suspend fun importModel(uri: Uri): Result<ModelInfo> = withContext(Dispatchers.IO) {
         try {
             val inputStream = context.contentResolver.openInputStream(uri)
-                ?: return@withContext Result.failure(Exception("无法打开文件"))
+                ?: return@withContext Result.failure(Exception("无法打开文件，请选择有效的模型文件"))
             
             val fileName = getFileName(uri) ?: "model_${System.currentTimeMillis()}.gguf"
+            
+            if (!fileName.lowercase().endsWith(".gguf") && !fileName.lowercase().endsWith(".bin")) {
+                inputStream.close()
+                return@withContext Result.failure(Exception("请选择 GGUF 或 BIN 格式的模型文件"))
+            }
+            
             val outputFile = File(getModelsDir(), fileName)
             
+            if (outputFile.exists()) {
+                outputFile.delete()
+            }
+            
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            var totalBytesRead = 0L
+            
             FileOutputStream(outputFile).use { output ->
-                inputStream.copyTo(output)
+                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                    totalBytesRead += bytesRead
+                }
             }
             inputStream.close()
             
@@ -55,25 +74,37 @@ class ModelRepository(private val context: Context) {
             saveModel(modelInfo)
             
             Result.success(modelInfo)
+        } catch (e: SecurityException) {
+            Result.failure(Exception("文件访问权限不足，请重试"))
+        } catch (e: OutOfMemoryError) {
+            Result.failure(Exception("模型文件过大，内存不足"))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception("导入失败: ${e.message}"))
         }
     }
     
     private fun getFileName(uri: Uri): String? {
-        val cursor = context.contentResolver.query(uri, null, null, null, null)
-        return cursor?.use {
-            val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-            it.moveToFirst()
-            if (nameIndex >= 0) it.getString(nameIndex) else null
+        return try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        cursor.getString(nameIndex)
+                    } else null
+                } else null
+            }
+        } catch (e: Exception) {
+            null
         }
     }
     
     private fun parseModelInfo(file: File, originalName: String): ModelInfo {
         return try {
             val size = file.length()
-            val quantization = detectQuantization(file)
-            val name = originalName.removeSuffix(".gguf")
+            val quantization = detectQuantization(file, originalName)
+            val name = originalName
+                .removeSuffix(".gguf")
+                .removeSuffix(".bin")
                 .replace("_", " ")
                 .replace("-", " ")
             
@@ -87,7 +118,7 @@ class ModelRepository(private val context: Context) {
         } catch (e: Exception) {
             ModelInfo(
                 id = "model_${System.currentTimeMillis()}",
-                name = originalName.removeSuffix(".gguf"),
+                name = originalName,
                 path = file.absolutePath,
                 size = file.length(),
                 quantization = "Unknown"
@@ -95,19 +126,28 @@ class ModelRepository(private val context: Context) {
         }
     }
     
-    private fun detectQuantization(file: File): String {
+    private fun detectQuantization(file: File, originalName: String): String {
         return try {
+            if (file.length() < 32) return "Unknown"
+            
             val buffer = ByteArray(32)
             file.inputStream().use { stream ->
-                stream.read(buffer, 0, 32)
+                val bytesRead = stream.read(buffer, 0, 32)
+                if (bytesRead < 4) return "Unknown"
             }
             
             val magic = String(buffer, 0, 4)
-            if (magic == "GGUF") {
+            if (magic == "GGUF" || magic == "FUGG") {
                 val version = buffer[4].toInt() and 0xFF
                 "GGUF v$version"
             } else {
-                "Q4_K_M"
+                val q4Index = originalName.lowercase().indexOf("q4")
+                if (q4Index >= 0) {
+                    val endIndex = minOf(q4Index + 5, originalName.length)
+                    originalName.substring(q4Index, endIndex).uppercase()
+                } else {
+                    "Q4_K_M"
+                }
             }
         } catch (e: Exception) {
             "Unknown"
@@ -121,7 +161,7 @@ class ModelRepository(private val context: Context) {
     }
     
     fun getImportedModels(): List<ModelInfo> {
-        val json = prefs.getString(KEY_MODELS, null) ?: return getDefaultModels()
+        val json = prefs.getString(KEY_MODELS, null) ?: return emptyList()
         return try {
             val array = JSONArray(json)
             (0 until array.length()).map { i ->
@@ -136,7 +176,7 @@ class ModelRepository(private val context: Context) {
                 )
             }
         } catch (e: Exception) {
-            getDefaultModels()
+            emptyList()
         }
     }
     
@@ -157,7 +197,7 @@ class ModelRepository(private val context: Context) {
     }
     
     fun getCurrentModel(): ModelInfo? {
-        val currentId = prefs.getString(KEY_CURRENT_MODEL, null) ?: return getDefaultModels().firstOrNull()
+        val currentId = prefs.getString(KEY_CURRENT_MODEL, null)
         return getImportedModels().find { it.id == currentId }
     }
     
@@ -187,18 +227,5 @@ class ModelRepository(private val context: Context) {
         }
         
         return true
-    }
-    
-    private fun getDefaultModels(): List<ModelInfo> {
-        return listOf(
-            ModelInfo(
-                id = "default_qwen",
-                name = "Qwen 2B GGUF",
-                path = "",
-                size = 1_610_612_736,
-                quantization = "Q4_K_M",
-                isLoaded = true
-            )
-        )
     }
 }

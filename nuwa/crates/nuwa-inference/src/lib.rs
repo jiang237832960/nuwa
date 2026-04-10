@@ -1,7 +1,7 @@
 mod gguf;
 mod llama;
 
-pub use gguf::{GGUFMeta, GGUFError};
+pub use gguf::{GGUFMeta, GGUFError, ModelType, TokenizerInfo};
 pub use llama::{LlamaEngine, LlamaError};
 
 use thiserror::Error;
@@ -57,6 +57,12 @@ impl ModelRegistry {
     }
 }
 
+impl Default for ModelRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct NuwaInferenceEngine {
     engine: LlamaEngine,
     models: Arc<RwLock<ModelRegistry>>,
@@ -93,6 +99,14 @@ impl NuwaInferenceEngine {
     pub fn get_token_count(&self, text: &str) -> usize {
         self.engine.get_token_count(text)
     }
+
+    pub fn get_current_model(&self) -> Option<ModelHandle> {
+        self.current_model.read().clone()
+    }
+
+    pub fn list_models(&self) -> Vec<ModelHandle> {
+        self.models.read().models.values().cloned().collect()
+    }
 }
 
 impl Default for NuwaInferenceEngine {
@@ -112,5 +126,19 @@ impl InferenceEngine for NuwaInferenceEngine {
 
     fn get_token_count(&self, text: &str) -> usize {
         self.engine.get_token_count(text)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gguf_meta_parsing() {
+        let data = b"GGUF\x03\x00\x00\x00";
+        let result = GGUFMeta::parse_from_bytes(data);
+        assert!(result.is_ok());
+        let meta = result.unwrap();
+        assert_eq!(meta.version, 3);
     }
 }
