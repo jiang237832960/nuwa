@@ -17,6 +17,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object ModelManager : Screen("model_manager")
     object Growth : Screen("growth")
+    object StorageManagement : Screen("storage_management")
     object NegotiationDemo : Screen("negotiation_demo")
 }
 

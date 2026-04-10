@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -23,6 +24,7 @@ import ai.nuwa.app.ui.screens.*
 
 @Composable
 fun NuwaApp() {
+    val context = LocalContext.current
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -42,6 +44,16 @@ fun NuwaApp() {
     val serviceStatus by viewModel.serviceStatus.collectAsState()
     val isModelLoaded by viewModel.isModelLoaded.collectAsState()
     val modelStatus by viewModel.modelStatus.collectAsState()
+    val operationLogs by viewModel.operationLogs.collectAsState()
+    val userStats by viewModel.userStats.collectAsState()
+    
+    val appVersion = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
+        } catch (e: Exception) {
+            "1.0.0"
+        }
+    }
     
     Scaffold(
         bottomBar = {
@@ -168,10 +180,15 @@ fun NuwaApp() {
             ) {
                 ProfileScreen(
                     currentModelName = if (isModelLoaded) modelStatus?.substringAfter("已加载: ")?.trim() else null,
-                    learnedSkillsCount = 0,
+                    learnedSkillsCount = userStats.learnedSkills.size,
+                    operationLogs = operationLogs,
+                    userStats = userStats,
+                    appVersion = appVersion,
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                     onNavigateToModelManager = { navController.navigate(Screen.ModelManager.route) },
-                    onNavigateToGrowth = { navController.navigate(Screen.Growth.route) }
+                    onNavigateToGrowth = { navController.navigate(Screen.Growth.route) },
+                    onNavigateToStorage = { navController.navigate(Screen.StorageManagement.route) },
+                    onRefreshLogs = { viewModel.refreshOperationLogs() }
                 )
             }
             
@@ -216,6 +233,24 @@ fun NuwaApp() {
                 exitTransition = { slideOutHorizontally { it } }
             ) {
                 GrowthScreen(
+                    onBack = { navController.popBackStack() },
+                    totalTasks = userStats.totalTasks,
+                    completedTasks = userStats.completedTasks,
+                    failedTasks = userStats.failedTasks,
+                    level = userStats.level,
+                    experience = userStats.experience,
+                    learnedSkillsCount = userStats.learnedSkills.size,
+                    usedDays = ((System.currentTimeMillis() - userStats.firstUseDate) / (1000 * 60 * 60 * 24)).toInt() + 1,
+                    completionRate = if (userStats.totalTasks > 0) userStats.completedTasks.toFloat() / userStats.totalTasks else 0f
+                )
+            }
+            
+            composable(
+                route = Screen.StorageManagement.route,
+                enterTransition = { slideInHorizontally { it } },
+                exitTransition = { slideOutHorizontally { it } }
+            ) {
+                StorageManagementScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

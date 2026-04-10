@@ -5,6 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ai.nuwa.app.data.model.*
 import ai.nuwa.app.data.repository.ModelRepository
+import ai.nuwa.app.data.repository.OperationLogEntry
+import ai.nuwa.app.data.repository.UserStatsRepository
+import ai.nuwa.app.data.repository.UserStats
+import ai.nuwa.app.data.repository.OperationStatus
 import ai.nuwa.app.bridge.NuwaBridge
 import ai.nuwa.app.inference.InferenceResult
 import ai.nuwa.app.inference.ModelManager
@@ -19,6 +23,7 @@ import kotlinx.coroutines.withContext
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     private val modelRepository = ModelRepository(application)
+    private val userStatsRepository = UserStatsRepository(application)
     private val bridge = NuwaBridge(modelRepository)
     private val modelManager = ModelManagerHolder.getInstance(modelRepository)
     
@@ -40,9 +45,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _modelStatus = MutableStateFlow<String?>(null)
     val modelStatus: StateFlow<String?> = _modelStatus.asStateFlow()
     
+    private val _operationLogs = MutableStateFlow<List<OperationLogEntry>>(emptyList())
+    val operationLogs: StateFlow<List<OperationLogEntry>> = _operationLogs.asStateFlow()
+    
+    private val _userStats = MutableStateFlow(UserStats())
+    val userStats: StateFlow<UserStats> = _userStats.asStateFlow()
+    
     init {
         checkServiceStatus()
         checkModelStatus()
+        loadUserStats()
     }
     
     private fun checkModelStatus() {
@@ -94,6 +106,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val connected = bridge.isServiceConnected()
             _serviceStatus.value = if (connected) "已连接" else "未连接"
         }
+    }
+    
+    private fun loadUserStats() {
+        viewModelScope.launch {
+            _userStats.value = userStatsRepository.getUserStats()
+            _operationLogs.value = userStatsRepository.getOperationLogs()
+        }
+    }
+    
+    fun refreshOperationLogs() {
+        _operationLogs.value = userStatsRepository.getOperationLogs()
+        _userStats.value = userStatsRepository.getUserStats()
     }
     
     fun sendMessage(text: String) {
@@ -211,11 +235,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentTask = currentTask.copy(status = TaskStatus.Completed)
             _currentTask.value = currentTask
             addMessage("任务完成！", false)
+            
+            val intentType = task.intent.intentType.name
+            userStatsRepository.recordTaskCompletion(true, intentType)
+            userStatsRepository.addOperationLog(
+                action = "任务执行",
+                status = OperationStatus.Success,
+                detail = "成功完成 ${intentType.replace("_", " ")} 任务",
+                intentType = intentType
+            )
+            loadUserStats()
         } else {
             currentTask = currentTask.copy(status = TaskStatus.Failed)
             _currentTask.value = currentTask
             val failedStep = currentTask.steps.indexOfFirst { it.status == StepStatus.Failed }
             addMessage("任务失败，步骤 ${failedStep + 1} 未完成", false, "部分步骤失败")
+            
+            val intentType = task.intent.intentType.name
+            userStatsRepository.recordTaskCompletion(false, intentType)
+            userStatsRepository.addOperationLog(
+                action = "任务执行",
+                status = OperationStatus.Failed,
+                detail = "${intentType.replace("_", " ")} 任务失败于步骤 ${failedStep + 1}",
+                intentType = intentType
+            )
+            loadUserStats()
         }
     }
     
