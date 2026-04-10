@@ -142,6 +142,12 @@ fun ProfileMainContent(
         item {
             ProfileSection(title = "支持") {
                 ProfileMenuItem(
+                    icon = Icons.Default.Settings,
+                    title = "设置",
+                    subtitle = "无障碍权限和其他设置",
+                    onClick = onNavigateToSettings
+                )
+                ProfileMenuItem(
                     icon = Icons.AutoMirrored.Filled.Help,
                     title = "帮助与反馈",
                     subtitle = "使用遇到问题",

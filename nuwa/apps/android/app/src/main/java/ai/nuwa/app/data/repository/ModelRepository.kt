@@ -46,7 +46,8 @@ class ModelRepository(private val context: Context) {
             
             val fileName = getFileName(uri) ?: "model_${System.currentTimeMillis()}.gguf"
             
-            if (!fileName.lowercase().endsWith(".gguf") && !fileName.lowercase().endsWith(".bin")) {
+            val lowerName = fileName.lowercase()
+            if (!lowerName.endsWith(".gguf") && !lowerName.endsWith(".bin")) {
                 inputStream.close()
                 return@withContext Result.failure(Exception("请选择 GGUF 或 BIN 格式的模型文件"))
             }
@@ -57,15 +58,15 @@ class ModelRepository(private val context: Context) {
                 outputFile.delete()
             }
             
-            val buffer = ByteArray(8192)
-            var bytesRead: Int
-            
-            FileOutputStream(outputFile).use { output ->
-                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
+            inputStream.use { input ->
+                FileOutputStream(outputFile).use { output ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                    }
                 }
             }
-            inputStream.close()
             
             val modelInfo = parseModelInfo(outputFile, fileName)
             saveModel(modelInfo)

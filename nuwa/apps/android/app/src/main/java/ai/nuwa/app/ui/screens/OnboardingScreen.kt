@@ -18,10 +18,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import ai.nuwa.app.data.repository.PreferenceManager
 
 data class OnboardingPage(
     val title: String,
@@ -35,6 +37,9 @@ data class OnboardingPage(
 fun OnboardingScreen(
     onComplete: () -> Unit
 ) {
+    val context = LocalContext.current
+    val preferenceManager = remember { PreferenceManager(context) }
+    
     val pages = listOf(
         OnboardingPage(
             title = "你好，我是女娲",
@@ -84,7 +89,10 @@ fun OnboardingScreen(
         ) {
             if (pagerState.currentPage < pages.size - 1) {
                 TextButton(
-                    onClick = onComplete,
+                    onClick = {
+                        preferenceManager.hasCompletedOnboarding = true
+                        onComplete()
+                    },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -130,7 +138,10 @@ fun OnboardingScreen(
 
             if (pagerState.currentPage == pages.size - 1) {
                 Button(
-                    onClick = onComplete,
+                    onClick = {
+                        preferenceManager.hasCompletedOnboarding = true
+                        onComplete()
+                    },
                     modifier = Modifier.height(48.dp),
                     shape = RoundedCornerShape(24.dp)
                 ) {
@@ -213,6 +224,8 @@ fun SplashScreen(
     onNavigateToOnboarding: () -> Unit,
     onNavigateToHome: () -> Unit
 ) {
+    val context = LocalContext.current
+    val preferenceManager = remember { PreferenceManager(context) }
     var animationPlayed by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -223,8 +236,7 @@ fun SplashScreen(
     LaunchedEffect(animationPlayed) {
         if (animationPlayed) {
             kotlinx.coroutines.delay(500)
-            val hasCompletedOnboarding = false
-            if (hasCompletedOnboarding) {
+            if (preferenceManager.hasCompletedOnboarding) {
                 onNavigateToHome()
             } else {
                 onNavigateToOnboarding()

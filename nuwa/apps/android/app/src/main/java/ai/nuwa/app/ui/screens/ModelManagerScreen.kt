@@ -160,8 +160,6 @@ fun ModelManagerScreen(
                     EmptyModelCard(
                         onImportClick = { 
                             filePickerLauncher.launch(arrayOf(
-                                "application/octet-stream",
-                                "application/x-gguf",
                                 "*/*"
                             ))
                         }
@@ -198,8 +196,6 @@ fun ModelManagerScreen(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { 
                             filePickerLauncher.launch(arrayOf(
-                                "application/octet-stream",
-                                "application/x-gguf",
                                 "*/*"
                             ))
                         }

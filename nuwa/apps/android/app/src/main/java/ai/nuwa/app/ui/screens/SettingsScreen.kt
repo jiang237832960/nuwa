@@ -9,7 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ai.nuwa.app.data.repository.PreferenceManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -18,6 +20,40 @@ fun SettingsScreen(
     onRequestAccessibility: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val preferenceManager = remember { PreferenceManager(context) }
+    var darkModeEnabled by remember { mutableStateOf(preferenceManager.darkModeEnabled) }
+    var showClearCacheDialog by remember { mutableStateOf(false) }
+    var cacheSize by remember { mutableStateOf(0L) }
+    
+    LaunchedEffect(Unit) {
+        cacheSize = getCacheSize(context)
+    }
+    
+    if (showClearCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearCacheDialog = false },
+            title = { Text("清除缓存") },
+            text = { Text("确定要清除所有缓存吗？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        clearCache(context)
+                        cacheSize = 0L
+                        showClearCacheDialog = false
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCacheDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+    
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("设置") },
@@ -63,34 +99,19 @@ fun SettingsScreen(
             
             item {
                 SettingsSection(title = "通用设置") {
-                    SettingsItem(
+                    SettingsItemSwitch(
                         title = "深色模式",
-                        subtitle = "暂未实现",
-                        onClick = { },
-                        enabled = false
+                        subtitle = if (darkModeEnabled) "已开启" else "已关闭",
+                        checked = darkModeEnabled,
+                        onCheckedChange = { enabled ->
+                            darkModeEnabled = enabled
+                            preferenceManager.darkModeEnabled = enabled
+                        }
                     )
                     SettingsItem(
-                        title = "语言",
-                        subtitle = "暂未实现",
-                        onClick = { },
-                        enabled = false
-                    )
-                }
-            }
-            
-            item {
-                SettingsSection(title = "成长设置") {
-                    SettingsItem(
-                        title = "自动学习",
-                        subtitle = "暂未实现",
-                        onClick = { },
-                        enabled = false
-                    )
-                    SettingsItem(
-                        title = "学习时间",
-                        subtitle = "暂未实现",
-                        onClick = { },
-                        enabled = false
+                        title = "清除缓存",
+                        subtitle = "当前缓存: ${formatSize(cacheSize)}",
+                        onClick = { showClearCacheDialog = true }
                     )
                 }
             }
@@ -104,9 +125,8 @@ fun SettingsScreen(
                     )
                     SettingsItem(
                         title = "帮助与反馈",
-                        subtitle = "暂未实现",
-                        onClick = { },
-                        enabled = false
+                        subtitle = "查看常见问题",
+                        onClick = { }
                     )
                 }
             }
@@ -184,6 +204,44 @@ fun SettingsItem(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun SettingsItemSwitch(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Surface(
+        onClick = { onCheckedChange(!checked) },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
+            )
         }
     }
 }
