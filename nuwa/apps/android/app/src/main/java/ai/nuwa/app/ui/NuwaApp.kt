@@ -40,6 +40,8 @@ fun NuwaApp() {
     val messages by viewModel.messages.collectAsState()
     val currentTask by viewModel.currentTask.collectAsState()
     val serviceStatus by viewModel.serviceStatus.collectAsState()
+    val isModelLoaded by viewModel.isModelLoaded.collectAsState()
+    val modelStatus by viewModel.modelStatus.collectAsState()
     
     Scaffold(
         bottomBar = {
@@ -131,10 +133,13 @@ fun NuwaApp() {
                     messages = messages,
                     currentTask = currentTask,
                     serviceStatus = serviceStatus,
+                    isModelLoaded = isModelLoaded,
+                    modelStatus = modelStatus,
                     onSendMessage = { text -> viewModel.sendMessage(text) },
                     onCancelTask = { viewModel.cancelTask() },
                     onNavigateToWorldState = { navController.navigate(Screen.WorldState.route) },
-                    onNavigateToTasks = { navController.navigate(Screen.Tasks.route) }
+                    onNavigateToTasks = { navController.navigate(Screen.Tasks.route) },
+                    onNavigateToModelManager = { navController.navigate(Screen.ModelManager.route) }
                 )
             }
             

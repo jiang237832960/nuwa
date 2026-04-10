@@ -36,17 +36,18 @@ fun HomeScreen(
     messages: List<ChatMessage>,
     currentTask: Task?,
     serviceStatus: String,
+    isModelLoaded: Boolean,
+    modelStatus: String?,
     onSendMessage: (String) -> Unit,
     onCancelTask: () -> Unit,
     onNavigateToWorldState: () -> Unit = {},
-    onNavigateToTasks: () -> Unit = {}
+    onNavigateToTasks: () -> Unit = {},
+    onNavigateToModelManager: () -> Unit = {}
 ) {
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
-    
-    val actualServiceStatus = remember(serviceStatus) { serviceStatus }
     
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -80,9 +81,9 @@ fun HomeScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = getStatusText(actualServiceStatus),
+                            text = getStatusText(serviceStatus),
                             style = MaterialTheme.typography.bodySmall,
-                            color = getStatusColor(actualServiceStatus)
+                            color = getStatusColor(serviceStatus)
                         )
                     }
                 }
@@ -99,6 +100,13 @@ fun HomeScreen(
                 containerColor = MaterialTheme.colorScheme.surface
             )
         )
+        
+        if (!isModelLoaded && modelStatus != null) {
+            ModelStatusBanner(
+                message = modelStatus,
+                onImportClick = onNavigateToModelManager
+            )
+        }
         
         AnimatedVisibility(
             visible = currentTask?.status == TaskStatus.Running,
@@ -123,17 +131,17 @@ fun HomeScreen(
         ) {
             if (messages.isEmpty()) {
                 item {
-                    WelcomeCard(onSuggestionClick = { suggestion ->
-                        onSendMessage(suggestion)
-                    })
+                    WelcomeCard(
+                        isModelLoaded = isModelLoaded,
+                        onSuggestionClick = { suggestion ->
+                            onSendMessage(suggestion)
+                        }
+                    )
                 }
             }
             
             items(messages) { message ->
-                ChatBubbleItem(
-                    message = message,
-                    onRetry = { }
-                )
+                ChatBubbleItem(message = message)
             }
         }
         
@@ -147,8 +155,48 @@ fun HomeScreen(
                     keyboardController?.hide()
                 }
             },
-            enabled = actualServiceStatus == "已连接"
+            enabled = isModelLoaded
         )
+    }
+}
+
+@Composable
+fun ModelStatusBanner(
+    message: String,
+    onImportClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.tertiaryContainer
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            }
+            TextButton(onClick = onImportClick) {
+                Text("导入模型")
+            }
+        }
     }
 }
 
@@ -166,7 +214,10 @@ private fun getStatusColor(status: String) = when (status) {
 }
 
 @Composable
-fun WelcomeCard(onSuggestionClick: (String) -> Unit) {
+fun WelcomeCard(
+    isModelLoaded: Boolean,
+    onSuggestionClick: (String) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -186,44 +237,50 @@ fun WelcomeCard(onSuggestionClick: (String) -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "告诉我你想做什么，我来帮你完成",
+                text = if (isModelLoaded) 
+                    "告诉我你想做什么，我来帮你完成" 
+                else 
+                    "请先导入AI模型才能开始对话",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(24.dp))
             
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "试试这样说：",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(
+            if (isModelLoaded) {
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AssistChip(
-                        onClick = { onSuggestionClick("给张三发消息") },
-                        label = { Text("发微信") },
-                        leadingIcon = { Icon(Icons.Default.Message, null, Modifier.size(18.dp)) },
-                        modifier = Modifier.weight(1f)
+                    Text(
+                        text = "试试这样说：",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AssistChip(
+                            onClick = { onSuggestionClick("给张三发消息") },
+                            label = { Text("发微信") },
+                            leadingIcon = { Icon(Icons.Default.Message, null, Modifier.size(18.dp)) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        AssistChip(
+                            onClick = { onSuggestionClick("帮我导航到公司") },
+                            label = { Text("导航") },
+                            leadingIcon = { Icon(Icons.Default.Navigation, null, Modifier.size(18.dp)) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     AssistChip(
-                        onClick = { onSuggestionClick("帮我导航到公司") },
-                        label = { Text("导航") },
-                        leadingIcon = { Icon(Icons.Default.Navigation, null, Modifier.size(18.dp)) },
-                        modifier = Modifier.weight(1f)
+                        onClick = { onSuggestionClick("打开WPS文档") },
+                        label = { Text("打开文档") },
+                        leadingIcon = { Icon(Icons.Default.Description, null, Modifier.size(18.dp)) }
                     )
                 }
-                AssistChip(
-                    onClick = { onSuggestionClick("打开文档") },
-                    label = { Text("打开WPS文档") },
-                    leadingIcon = { Icon(Icons.Default.Description, null, Modifier.size(18.dp)) }
-                )
             }
         }
     }
@@ -314,10 +371,7 @@ fun TaskProgressCard(
 }
 
 @Composable
-fun ChatBubbleItem(
-    message: ChatMessage,
-    onRetry: () -> Unit = {}
-) {
+fun ChatBubbleItem(message: ChatMessage) {
     val isUser = message.isUser
     
     Column(
@@ -374,14 +428,6 @@ fun ChatBubbleItem(
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
-                        if (message.isUser) {
-                            TextButton(
-                                onClick = onRetry,
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text("重试", style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
                     }
                 }
             }
@@ -429,7 +475,7 @@ fun ChatInputBar(
                 value = text,
                 onValueChange = onTextChange,
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("输入你想让我帮你做的事...") },
+                placeholder = { Text(if (enabled) "输入你想让我帮你做的事..." else "请先导入AI模型") },
                 enabled = enabled,
                 maxLines = 3,
                 shape = RoundedCornerShape(24.dp),

@@ -3,7 +3,6 @@ package ai.nuwa.app.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
-import android.os.Environment
 import android.provider.OpenableColumns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -60,12 +59,10 @@ class ModelRepository(private val context: Context) {
             
             val buffer = ByteArray(8192)
             var bytesRead: Int
-            var totalBytesRead = 0L
             
             FileOutputStream(outputFile).use { output ->
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                     output.write(buffer, 0, bytesRead)
-                    totalBytesRead += bytesRead
                 }
             }
             inputStream.close()
@@ -99,58 +96,36 @@ class ModelRepository(private val context: Context) {
     }
     
     private fun parseModelInfo(file: File, originalName: String): ModelInfo {
-        return try {
-            val size = file.length()
-            val quantization = detectQuantization(file, originalName)
-            val name = originalName
-                .removeSuffix(".gguf")
-                .removeSuffix(".bin")
-                .replace("_", " ")
-                .replace("-", " ")
-            
-            ModelInfo(
-                id = "model_${System.currentTimeMillis()}",
-                name = name.ifBlank { "Qwen GGUF Model" },
-                path = file.absolutePath,
-                size = size,
-                quantization = quantization
-            )
-        } catch (e: Exception) {
-            ModelInfo(
-                id = "model_${System.currentTimeMillis()}",
-                name = originalName,
-                path = file.absolutePath,
-                size = file.length(),
-                quantization = "Unknown"
-            )
-        }
+        val size = file.length()
+        val quantization = detectQuantization(originalName)
+        val name = originalName
+            .removeSuffix(".gguf")
+            .removeSuffix(".bin")
+            .replace("_", " ")
+            .replace("-", " ")
+        
+        return ModelInfo(
+            id = "model_${System.currentTimeMillis()}",
+            name = name.ifBlank { "Imported Model" },
+            path = file.absolutePath,
+            size = size,
+            quantization = quantization
+        )
     }
     
-    private fun detectQuantization(file: File, originalName: String): String {
-        return try {
-            if (file.length() < 32) return "Unknown"
-            
-            val buffer = ByteArray(32)
-            file.inputStream().use { stream ->
-                val bytesRead = stream.read(buffer, 0, 32)
-                if (bytesRead < 4) return "Unknown"
-            }
-            
-            val magic = String(buffer, 0, 4)
-            if (magic == "GGUF" || magic == "FUGG") {
-                val version = buffer[4].toInt() and 0xFF
-                "GGUF v$version"
-            } else {
-                val q4Index = originalName.lowercase().indexOf("q4")
-                if (q4Index >= 0) {
-                    val endIndex = minOf(q4Index + 5, originalName.length)
-                    originalName.substring(q4Index, endIndex).uppercase()
-                } else {
-                    "Q4_K_M"
-                }
-            }
-        } catch (e: Exception) {
-            "Unknown"
+    private fun detectQuantization(fileName: String): String {
+        val lower = fileName.lowercase()
+        return when {
+            lower.contains("q8_0") || lower.contains("q8") -> "Q8_0"
+            lower.contains("q6_k") || lower.contains("q6") -> "Q6_K"
+            lower.contains("q5_k_m") || lower.contains("q5") -> "Q5_K_M"
+            lower.contains("q4_k_m") || lower.contains("q4") -> "Q4_K_M"
+            lower.contains("q3_k_m") || lower.contains("q3") -> "Q3_K_M"
+            lower.contains("q2_k") || lower.contains("q2") -> "Q2_K"
+            lower.contains("q4_0") -> "Q4_0"
+            lower.contains("q5_0") -> "Q5_0"
+            lower.contains("q6_0") -> "Q6_0"
+            else -> "Q4_K_M"
         }
     }
     
@@ -197,7 +172,7 @@ class ModelRepository(private val context: Context) {
     }
     
     fun getCurrentModel(): ModelInfo? {
-        val currentId = prefs.getString(KEY_CURRENT_MODEL, null)
+        val currentId = prefs.getString(KEY_CURRENT_MODEL, null) ?: return null
         return getImportedModels().find { it.id == currentId }
     }
     
@@ -228,4 +203,6 @@ class ModelRepository(private val context: Context) {
         
         return true
     }
+    
+    fun hasModels(): Boolean = getImportedModels().isNotEmpty()
 }

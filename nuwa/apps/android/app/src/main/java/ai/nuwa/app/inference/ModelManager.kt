@@ -13,34 +13,37 @@ class ModelManager(
     private var currentModelInfo: ModelInfo? = null
     
     suspend fun loadModel(modelInfo: ModelInfo): Result<InferenceEngine> = withContext(Dispatchers.IO) {
-        try {
-            if (modelInfo.path.isEmpty()) {
-                return@withContext Result.failure(Exception("模型文件不存在"))
-            }
-            
-            val file = File(modelInfo.path)
-            if (!file.exists()) {
-                return@withContext Result.failure(Exception("模型文件未找到: ${modelInfo.path}"))
-            }
-            
-            unloadCurrentModel()
-            
-            currentEngine = InferenceEngine.load(modelInfo.path)
-            currentModelInfo = modelInfo
-            
-            Result.success(currentEngine!!)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    
-    suspend fun generate(prompt: String): InferenceResult = withContext(Dispatchers.IO) {
-        val engine = currentEngine
-        if (engine == null) {
-            return@withContext InferenceResult.Error("没有加载的模型")
+        if (modelInfo.path.isEmpty()) {
+            return@withContext Result.failure(Exception("模型文件不存在"))
         }
         
-        engine.generate(prompt)
+        val file = File(modelInfo.path)
+        if (!file.exists()) {
+            return@withContext Result.failure(Exception("模型文件未找到"))
+        }
+        
+        unloadCurrentModel()
+        
+        val result = InferenceEngine.load(modelInfo.path)
+        result.fold(
+            onSuccess = { engine ->
+                currentEngine = engine
+                currentModelInfo = modelInfo
+                Result.success(engine)
+            },
+            onFailure = { e ->
+                Result.failure(e)
+            }
+        )
+    }
+    
+    suspend fun generate(prompt: String): InferenceResult {
+        val engine = currentEngine
+        if (engine == null) {
+            return InferenceResult.NoModel
+        }
+        
+        return engine.generate(prompt)
     }
     
     fun unloadCurrentModel() {
@@ -53,7 +56,7 @@ class ModelManager(
     
     fun getCurrentEngine(): InferenceEngine? = currentEngine
     
-    fun isModelLoaded(): Boolean = currentEngine?.isModelLoaded() == true
+    fun isModelLoaded(): Boolean = currentEngine?.isLoaded == true
     
     fun getMetadata(): ModelMetadata? = currentEngine?.getMetadata()
 }
@@ -66,5 +69,10 @@ object ModelManagerHolder {
             modelManager = ModelManager(repository)
         }
         return modelManager!!
+    }
+    
+    fun reset() {
+        modelManager?.unloadCurrentModel()
+        modelManager = null
     }
 }

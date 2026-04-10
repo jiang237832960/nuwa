@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ai.nuwa.app.data.repository.ModelInfo
@@ -42,8 +43,13 @@ fun ModelManagerScreen(
     var statusType by remember { mutableStateOf(StatusType.Info) }
     var isImporting by remember { mutableStateOf(false) }
     
-    val models = remember { modelRepository.getImportedModels() }
-    val currentModel = remember { modelRepository.getCurrentModel() }
+    var models by remember { mutableStateOf<List<ModelInfo>>(emptyList()) }
+    var currentModel by remember { mutableStateOf<ModelInfo?>(null) }
+    
+    LaunchedEffect(Unit) {
+        models = modelRepository.getImportedModels()
+        currentModel = modelRepository.getCurrentModel()
+    }
     
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -63,6 +69,7 @@ fun ModelManagerScreen(
                         onSuccess = { model ->
                             statusMessage = "导入成功: ${model.name}"
                             statusType = StatusType.Success
+                            models = modelRepository.getImportedModels()
                         },
                         onFailure = { error ->
                             statusMessage = error.message ?: "导入失败"
@@ -85,19 +92,6 @@ fun ModelManagerScreen(
             navigationIcon = {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
-            actions = {
-                if (!isImporting) {
-                    IconButton(onClick = { 
-                        filePickerLauncher.launch(arrayOf(
-                            "application/octet-stream",
-                            "application/x-gguf",
-                            "*/*"
-                        ))
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = "导入模型")
-                    }
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -158,26 +152,12 @@ fun ModelManagerScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                CurrentModelCard(
-                    model = currentModel,
-                    onLoadModel = { modelId ->
-                        modelRepository.setCurrentModel(modelId)
-                    }
-                )
-            }
-            
-            item {
-                Text(
-                    text = "已导入模型",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+                HelpCard()
             }
             
             if (models.isEmpty()) {
                 item {
-                    ImportHelpCard(
+                    EmptyModelCard(
                         onImportClick = { 
                             filePickerLauncher.launch(arrayOf(
                                 "application/octet-stream",
@@ -188,13 +168,23 @@ fun ModelManagerScreen(
                     )
                 }
             } else {
+                item {
+                    Text(
+                        text = "已导入的模型",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+                
                 items(models) { model ->
                     ImportedModelCard(
                         model = model,
                         isSelected = model.id == currentModel?.id,
                         onSelect = {
                             modelRepository.setCurrentModel(model.id)
-                            statusMessage = "已切换到: ${model.name}"
+                            currentModel = model
+                            statusMessage = "已选择: ${model.name}"
                             statusType = StatusType.Success
                         },
                         onDelete = {
@@ -240,6 +230,8 @@ fun ModelManagerScreen(
                 TextButton(
                     onClick = {
                         modelRepository.deleteModel(model.id)
+                        models = modelRepository.getImportedModels()
+                        currentModel = modelRepository.getCurrentModel()
                         statusMessage = "已删除: ${model.name}"
                         statusType = StatusType.Success
                         showDeleteDialog = null
@@ -261,63 +253,84 @@ fun ModelManagerScreen(
 }
 
 @Composable
-fun CurrentModelCard(
-    model: ModelInfo?,
-    onLoadModel: (String) -> Unit
-) {
+fun HelpCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Default.Psychology,
-                    null,
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "当前使用",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                )
-                Text(
-                    text = model?.name ?: "未选择模型",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                model?.let {
-                    Text(
-                        text = "${formatFileSize(it.size)} · ${it.quantization}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            
-            if (model != null) {
-                Icon(
-                    Icons.Default.CheckCircle,
+                    Icons.Default.Info,
                     null,
                     tint = MaterialTheme.colorScheme.primary
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "关于AI模型",
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "女娲需要AI模型才能工作。请导入GGUF格式的模型文件，如Qwen、LLaMA等。模型文件会保存在本地设备上，不会上传到任何服务器。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "推荐使用4-8B参数的中文优化模型，如Qwen2-4B-GGUF。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+fun EmptyModelCard(onImportClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                Icons.Default.Memory,
+                null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "暂无模型",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "请导入一个GGUF格式的AI模型文件开始使用",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            FilledTonalButton(onClick = onImportClick) {
+                Icon(Icons.Default.Add, null)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("选择模型文件")
             }
         }
     }
@@ -418,47 +431,6 @@ fun ImportedModelCard(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun ImportHelpCard(onImportClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                Icons.Default.FolderOpen,
-                null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "导入 GGUF 模型",
-                style = MaterialTheme.typography.titleSmall
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "支持 Qwen、LLaMA、ChatGLM 等主流模型格式",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            FilledTonalButton(onClick = onImportClick) {
-                Icon(Icons.Default.Add, null)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("选择模型文件")
             }
         }
     }
