@@ -162,10 +162,10 @@ fun LearnedSkillCard(skill: LearnedSkill) {
 fun RecommendedSkillsTab() {
     val recommendations = remember {
         listOf(
-            RecommendedSkill("淘宝订单查看", "com.taobao.taobao"),
-            RecommendedSkill("美团外卖下单", "com.sankuai.meituan"),
-            RecommendedSkill("抖音内容发布", "com.ss.android.ugc.aweme"),
-            RecommendedSkill("网易云音乐播放", "com.netease.cloudmusic")
+            RecommendedSkill("微信发消息", "com.tencent.mm"),
+            RecommendedSkill("高德导航", "com.autonavi.minimap"),
+            RecommendedSkill("WPS文档", "cn.wps.moffice_eng"),
+            RecommendedSkill("支付宝付款", "com.eg.android.AlipayGphone")
         )
     }
     
@@ -177,7 +177,7 @@ fun RecommendedSkillsTab() {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                 )
             ) {
                 Row(
@@ -185,16 +185,22 @@ fun RecommendedSkillsTab() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.Lightbulb,
+                        Icons.Default.AutoAwesome,
                         null,
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "推荐技能暂未实现。当前版本仅支持微信、高德、WPS、支付宝的基础操作。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "已支持的技能",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = "当前版本已实现的基础操作技能",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -204,8 +210,9 @@ fun RecommendedSkillsTab() {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                )
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -225,12 +232,38 @@ fun RecommendedSkillsTab() {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    TextButton(
-                        onClick = { },
-                        enabled = false
-                    ) {
-                        Text("暂未实现")
-                    }
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+        
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "更多技能将在后续版本更新",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
